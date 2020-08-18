@@ -1,0 +1,11 @@
+FROM openjdk:8
+
+MAINTAINER akumar293
+
+
+WORKDIR app
+COPY HelloWorld.jar /app
+
+EXPOSE 8080 8081
+
+ENTRYPOINT exec java -jar ./HelloWorld.jar
