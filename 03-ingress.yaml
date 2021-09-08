@@ -1,0 +1,35 @@
+..---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/auth-tls-pass-certificate-to-upstream: "false"
+    nginx.ingress.kubernetes.io/auth-tls-secret: prod/pkiv01-rootca
+    nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
+    nginx.ingress.kubernetes.io/auth-tls-verify-depth: "3"
+  labels:
+    app: telemarket
+    environment: prod
+    tier: backend
+    pki: v01
+  name: prod-telemarket
+  namespace: prod
+  #annotations:
+    #ingress.kubernetes.io/whitelist-source-range: "172.17.153.82/32,172.17.153.83/32"
+spec:
+  tls:
+  - hosts:
+    - pkiv01-prod-anurag.telemarket.com
+    secretName: pkiv01-ingress-secrets
+  rules:
+  - host: pkiv01-prod-anurag.telemarket.com
+    http:
+      paths:
+      - backend:
+          serviceName: prod-telemarket
+          servicePort: 8080
+        path: /
+      - backend:
+          serviceName: prod-telemarket
+          servicePort: 9080
+        path: /health
