@@ -1,0 +1,152 @@
+
+Combined RFI System Flow (All Processes)
+sequenceDiagram
+    autonumber
+    participant Client as CSAWC|CSAWT (Alert Workflow)
+    participant RFI_FE as RFI Microfrontend (iframe)
+    participant RFI_MS as RFI Microservice (API)
+    participant TTS_MS as TTS Microservice
+    participant Screening_API as Screening API (CSAWC|CSAWT)
+
+    Note over Client,Screening_API: Complete RFI System Flow
+
+    %% 1. RFI Frontend Injection via iframe
+    rect rgb(240, 248, 255)
+    Note over Client,RFI_FE: 1. RFI Frontend Injection
+    Client->>RFI_FE: GET /rfi?alertId={id}&systemName=CSAWC|CSAWT
+    RFI_FE->>RFI_FE: init() parse alertId, systemName
+
+    par Init calls
+        RFI_FE->>RFI_MS: GET /alertInformation?alertId={id}&systemName=CSAWC|CSAWT
+        RFI_MS->>Screening_API: GET /alertInformation?alertId={id}
+        Screening_API-->>RFI_MS: alertInformation
+        RFI_MS-->>RFI_FE: alertInformation
+    and
+        RFI_FE->>RFI_MS: GET /configuredQuestions?systemName=CSAWC|CSAWT
+        RFI_MS-->>RFI_FE: configuredQuestions
+    end
+
+    RFI_FE->>RFI_FE: forkJoin(alertInformation, configuredQuestions)
+    RFI_FE-->>Client: Render Landing Page (alert info + dropdown)
+    end
+
+    %% 2. Create RFI
+    rect rgb(240, 255, 240)
+    Note over RFI_FE,Screening_API: 2. Create RFI
+    RFI_FE->>RFI_MS: POST /createRFI
+    RFI_MS->>TTS_MS: POST /CreateRFI
+    TTS_MS-->>RFI_MS: 201 Created { rfiId }
+    par Post-create callbacks
+        RFI_MS->>Screening_API: POST /audit { rfiId }
+        RFI_MS->>Screening_API: POST /alertToInquiry { rfiId }
+    end
+    RFI_MS-->>RFI_FE: { rfiId }
+    end
+
+    %% 3. Response flow from TTS
+    rect rgb(255, 248, 240)
+    Note over TTS_MS,Screening_API: 3. Response Flow from TTS
+    TTS_MS->>RFI_MS: POST /response { rfiId, response, s3Keys[] }
+    
+    alt If s3Keys present
+        loop For each s3Key
+            RFI_MS->>TTS_MS: GET /attachments?s3Key={key} (async)
+            TTS_MS-->>RFI_MS: 200 OK { attachment }
+        end
+    end
+    
+    RFI_MS->>Screening_API: POST /audit { rfiId, response }
+    RFI_MS-->>TTS_MS: 200 OK (callback acknowledgment)
+    end
+
+    %% 4. Alert Closure
+    rect rgb(255, 240, 255)
+    Note over Client,TTS_MS: 4. Alert Closure
+    Client->>RFI_MS: POST /alertClosure?alertId={id}
+    RFI_MS->>TTS_MS: POST /alertClosure { alertId }
+    TTS_MS-->>RFI_MS: 200 OK { closure confirmation }
+    RFI_MS-->>Client: 200 OK { closure confirmation }
+    end
+ ********************************************************************************************
+ 1. RFI Frontend Injection via iframe
+ sequenceDiagram
+    autonumber
+    participant Client as CSAWC|CSAWT (Alert Workflow)
+    participant RFI_FE as RFI Microfrontend (iframe)
+    participant RFI_MS as RFI Microservice (API)
+    participant Screening_API as Screening API (CSAWC|CSAWT)
+
+    Note over Client,RFI_FE: RFI frontend injected via iframe
+
+    Client->>RFI_FE: GET /rfi?alertId={id}&systemName=CSAWC|CSAWT
+    RFI_FE->>RFI_FE: init() parse alertId, systemName
+
+    par Init calls
+        RFI_FE->>RFI_MS: GET /alertInformation?alertId={id}&systemName=CSAWC|CSAWT
+        RFI_MS->>Screening_API: GET /alertInformation?alertId={id}
+        Screening_API-->>RFI_MS: alertInformation
+        RFI_MS-->>RFI_FE: alertInformation
+    and
+        RFI_FE->>RFI_MS: GET /configuredQuestions?systemName=CSAWC|CSAWT
+        RFI_MS-->>RFI_FE: configuredQuestions
+    end
+
+    Note over RFI_MS,Screening_API: Routes based on systemName (CSAWC|CSAWT)
+
+    RFI_FE->>RFI_FE: forkJoin(alertInformation, configuredQuestions)
+    RFI_FE-->>Client: Render Landing Page (alert info + dropdown)
+ *****************************************************************************************************
+ 2. Create RFI Flow
+ 
+ sequenceDiagram
+    autonumber
+    participant RFI_FE as RFI Microfrontend (iframe)
+    participant RFI_MS as RFI Microservice (API)
+    participant TTS_MS as TTS Microservice
+    participant Screening_API as Screening API (CSAWC|CSAWT)
+
+    Note over RFI_FE,RFI_MS: Create RFI
+    RFI_FE->>RFI_MS: POST /createRFI
+    RFI_MS->>TTS_MS: POST /CreateRFI
+    TTS_MS-->>RFI_MS: 201 Created { rfiId }
+    par Post-create callbacks
+        RFI_MS->>Screening_API: POST /audit { rfiId }
+        RFI_MS->>Screening_API: POST /alertToInquiry { rfiId }
+    end
+    RFI_MS-->>RFI_FE: { rfiId }
+
+***********************************************************************************
+3. Response Flow from TTS
+
+sequenceDiagram
+    autonumber
+    participant TTS_MS as TTS Microservice
+    participant RFI_MS as RFI Microservice (API)
+    participant Screening_API as Screening API (CSAWC|CSAWT)
+
+    Note over TTS_MS,RFI_MS: Response flow from TTS
+    TTS_MS->>RFI_MS: POST /response { rfiId, response, s3Keys[] }
+    
+    alt If s3Keys present
+        loop For each s3Key
+            RFI_MS->>TTS_MS: GET /attachments?s3Key={key} (async)
+            TTS_MS-->>RFI_MS: 200 OK { attachment }
+        end
+    end
+    
+    RFI_MS->>Screening_API: POST /audit { rfiId, response }
+    RFI_MS-->>TTS_MS: 200 OK (callback acknowledgment)
+
+*****************************************************************************************
+4. Alert Closure Flow
+sequenceDiagram
+    autonumber
+    participant Client as CSAWC|CSAWT (Alert Workflow)
+    participant RFI_MS as RFI Microservice (API)
+    participant TTS_MS as TTS Microservice
+
+    Note over Client,TTS_MS: Alert Closure flow
+    Client->>RFI_MS: POST /alertClosure?alertId={id}
+    RFI_MS->>TTS_MS: POST /alertClosure { alertId }
+    TTS_MS-->>RFI_MS: 200 OK { closure confirmation }
+    RFI_MS-->>Client: 200 OK { closure confirmation }
