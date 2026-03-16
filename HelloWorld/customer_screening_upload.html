@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Screening — Bulk Data Upload</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-mono: 'Cascadia Code', 'Consolas', monospace;
+    --bg-primary: #ffffff;
+    --bg-secondary: #f7f7f6;
+    --bg-tertiary: #f0f0ef;
+    --text-primary: #1a1a1a;
+    --text-secondary: #6b6b68;
+    --border-tertiary: rgba(0,0,0,0.12);
+    --border-secondary: rgba(0,0,0,0.22);
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-primary: #1e1e1d;
+      --bg-secondary: #2a2a29;
+      --bg-tertiary: #333332;
+      --text-primary: #f0f0ee;
+      --text-secondary: #9a9a96;
+      --border-tertiary: rgba(255,255,255,0.1);
+      --border-secondary: rgba(255,255,255,0.2);
+    }
+  }
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+  .container { max-width: 860px; margin: 0 auto; }
+  .page-header {
+    background: var(--bg-primary);
+    border: 0.5px solid var(--border-tertiary);
+    border-radius: var(--radius-xl);
+    padding: 1.5rem 2rem;
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-icon {
+    width: 36px; height: 36px; border-radius: 9px;
+    background: #185FA5; display: flex; align-items: center; justify-content: center;
+  }
+  .brand-icon svg { width: 18px; height: 18px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .brand-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+  .brand-sub { font-size: 12px; color: var(--text-secondary); margin-top: 1px; }
+  .user-pill {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 20px;
+    background: var(--bg-secondary); border: 0.5px solid var(--border-tertiary);
+    font-size: 13px; color: var(--text-secondary);
+  }
+  .user-avatar {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: #E6F1FB; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600; color: #185FA5;
+  }
+  .main-card {
+    background: var(--bg-primary);
+    border: 0.5px solid var(--border-tertiary);
+    border-radius: var(--radius-xl);
+    padding: 2rem;
+    margin-bottom: 1.25rem;
+  }
+  .section-header { margin-bottom: 1.5rem; }
+  .tag {
+    display: inline-block;
+    font-size: 11px; font-weight: 600; padding: 3px 10px;
+    border-radius: 20px; background: #E6F1FB; color: #0C447C;
+    letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 8px;
+  }
+  .section-title { font-size: 20px; font-weight: 600; color: var(--text-primary); }
+  .section-sub { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
+  .step-indicator { display: flex; align-items: center; margin-bottom: 2rem; }
+  .step { display: flex; align-items: center; gap: 8px; }
+  .step-dot {
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 1.5px solid var(--border-secondary);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; color: var(--text-secondary);
+    background: var(--bg-primary); transition: all 0.3s;
+  }
+  .step-dot.active { border-color: #378ADD; color: #378ADD; background: #E6F1FB; }
+  .step-dot.done { border-color: #0F6E56; color: white; background: #0F6E56; font-size: 13px; }
+  .step-label { font-size: 12px; color: var(--text-secondary); font-weight: 400; }
+  .step-label.active { color: #185FA5; font-weight: 600; }
+  .step-label.done { color: #0F6E56; }
+  .step-line { flex: 1; height: 1px; background: var(--border-tertiary); margin: 0 10px; min-width: 24px; transition: background 0.3s; }
+  .step-line.done { background: #0F6E56; }
+  .status-banner {
+    display: none; padding: 12px 16px; border-radius: var(--radius-md);
+    margin-bottom: 1.25rem; font-size: 13px; align-items: center; gap: 10px;
+  }
+  .status-banner.visible { display: flex; }
+  .status-banner.validating { background: rgba(55,138,221,0.08); border: 0.5px solid rgba(55,138,221,0.3); color: #0C447C; }
+  .status-banner.success { background: rgba(15,110,86,0.08); border: 0.5px solid rgba(15,110,86,0.3); color: #085041; }
+  .status-banner.error { background: rgba(226,75,74,0.08); border: 0.5px solid rgba(226,75,74,0.3); color: #A32D2D; }
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid rgba(55,138,221,0.25);
+    border-top-color: #378ADD; border-radius: 50%;
+    animation: spin 0.8s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-icon {
+    width: 18px; height: 18px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 11px; font-weight: 700;
+  }
+  .icon-check { background: #0F6E56; color: white; }
+  .icon-x { background: #A32D2D; color: white; }
+  .confirm-section {
+    display: none; background: #EAF3DE;
+    border: 0.5px solid rgba(99,153,34,0.3);
+    border-radius: var(--radius-lg); padding: 1.1rem 1.5rem;
+    margin-bottom: 1.25rem; align-items: center;
+    justify-content: space-between; gap: 16px;
+  }
+  .confirm-section.visible { display: flex; }
+  .confirm-text { font-size: 13px; color: #27500A; }
+  .confirm-text strong { font-weight: 600; display: block; margin-bottom: 3px; font-size: 14px; }
+  .form-inner { padding: 1.5rem; background: var(--bg-secondary); border-radius: var(--radius-lg); margin-bottom: 1.25rem; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 1.25rem; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+  .form-label span { color: #E24B4A; margin-left: 2px; }
+  select, input[type="text"] {
+    width: 100%; height: 40px; padding: 0 36px 0 12px;
+    border: 0.5px solid var(--border-secondary);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary); color: var(--text-primary);
+    font-size: 14px; font-family: var(--font-sans);
+    cursor: pointer; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  select:focus, input[type="text"]:focus {
+    outline: none; border-color: #378ADD;
+    box-shadow: 0 0 0 3px rgba(55,138,221,0.12);
+  }
+  .drop-zone {
+    border: 1.5px dashed var(--border-secondary);
+    border-radius: var(--radius-lg); padding: 2.5rem 2rem;
+    text-align: center; cursor: pointer; transition: all 0.2s;
+    background: var(--bg-primary);
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: #378ADD;
+    background: rgba(55,138,221,0.04);
+  }
+  .drop-icon {
+    width: 48px; height: 48px; margin: 0 auto 14px;
+    background: #E6F1FB; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .drop-icon svg { width: 22px; height: 22px; stroke: #378ADD; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .drop-title { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 5px; }
+  .drop-sub { font-size: 13px; color: var(--text-secondary); }
+  .drop-sub strong { color: #378ADD; }
+  input[type="file"] { display: none; }
+  .progress-bar { height: 4px; background: var(--bg-tertiary); border-radius: 2px; margin-top: 12px; overflow: hidden; display: none; }
+  .progress-bar.visible { display: block; }
+  .progress-fill { height: 100%; background: #378ADD; border-radius: 2px; width: 0%; transition: width 0.3s; }
+  .file-chip {
+    display: none; align-items: center; gap: 10px;
+    background: var(--bg-primary); border: 0.5px solid var(--border-tertiary);
+    border-radius: var(--radius-md); padding: 10px 14px; margin-top: 14px;
+  }
+  .file-chip.visible { display: flex; }
+  .file-chip-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: #E6F1FB; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .file-chip-icon svg { width: 15px; height: 15px; stroke: #185FA5; fill: none; stroke-width: 2; stroke-linecap: round; }
+  .file-chip-name { font-size: 13px; font-weight: 600; color: var(--text-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-chip-size { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+  .file-chip-remove {
+    width: 22px; height: 22px; border-radius: 50%; border: none;
+    background: transparent; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-secondary); font-size: 18px; line-height: 1; padding: 0;
+  }
+  .file-chip-remove:hover { background: var(--bg-tertiary); }
+  .action-bar { display: flex; align-items: center; gap: 12px; justify-content: flex-end; margin-top: 1.25rem; }
+  .btn {
+    height: 40px; padding: 0 22px; border-radius: var(--radius-md);
+    font-size: 14px; font-family: var(--font-sans); font-weight: 500;
+    cursor: pointer; border: 0.5px solid var(--border-secondary);
+    background: transparent; color: var(--text-primary); transition: all 0.15s;
+  }
+  .btn:hover { background: var(--bg-secondary); }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: #185FA5; color: #fff; border-color: #185FA5; }
+  .btn-primary:hover { background: #0C447C; border-color: #0C447C; }
+  .btn-primary:disabled {
+    background: var(--bg-secondary); color: var(--text-secondary);
+    border-color: var(--border-tertiary); cursor: not-allowed; transform: none;
+  }
+  .btn-success { background: #0F6E56; color: #fff; border-color: #0F6E56; font-weight: 600; }
+  .btn-success:hover { background: #085041; border-color: #085041; }
+  .divider { height: 0.5px; background: var(--border-tertiary); margin: 0 0 1.25rem; }
+  .table-card {
+    background: var(--bg-primary);
+    border: 0.5px solid var(--border-tertiary);
+    border-radius: var(--radius-xl); overflow: hidden;
+  }
+  .table-header-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.1rem 1.5rem;
+    border-bottom: 0.5px solid var(--border-tertiary);
+  }
+  .table-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+  .count-badge {
+    font-size: 12px; padding: 3px 10px; border-radius: 20px;
+    background: var(--bg-secondary); color: var(--text-secondary);
+    border: 0.5px solid var(--border-tertiary);
+  }
+  .table-section { display: none; }
+  .table-section.visible { display: block; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  thead th {
+    padding: 10px 14px; text-align: left;
+    font-weight: 600; font-size: 11px;
+    color: var(--text-secondary); letter-spacing: 0.04em; text-transform: uppercase;
+    border-bottom: 0.5px solid var(--border-tertiary);
+    background: var(--bg-secondary);
+  }
+  tbody tr { border-bottom: 0.5px solid var(--border-tertiary); transition: background 0.1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--bg-secondary); }
+  tbody td { padding: 11px 14px; color: var(--text-primary); vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .req-id {
+    font-family: var(--font-mono); font-size: 12px;
+    color: var(--text-secondary); background: var(--bg-secondary);
+    padding: 2px 8px; border-radius: 4px; border: 0.5px solid var(--border-tertiary);
+  }
+  .file-link { font-weight: 600; color: #185FA5; text-decoration: none; }
+  .file-link:hover { text-decoration: underline; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 11px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+  }
+  .status-fail { background: #FCEBEB; color: #A32D2D; }
+  .status-success { background: #EAF3DE; color: #3B6D11; }
+  .col-id { width: 100px; }
+  .col-file { width: 200px; }
+  .col-by { width: 130px; }
+  .col-date { width: 150px; }
+  .col-type { width: 140px; }
+  .col-status { width: 110px; }
+  .type-chip {
+    font-size: 11px; padding: 2px 9px; border-radius: 20px;
+    background: var(--bg-secondary); color: var(--text-secondary);
+    border: 0.5px solid var(--border-tertiary);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="page-header">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div>
+        <div class="brand-title">Customer Screening Platform</div>
+        <div class="brand-sub">Citi &mdash; Compliance &amp; Risk</div>
+      </div>
+    </div>
+    <div class="user-pill">
+      <div class="user-avatar">AK</div>
+      Anurag Kumar &nbsp;&middot;&nbsp; VP
+    </div>
+  </div>
+
+  <div class="main-card">
+    <div class="section-header">
+      <span class="tag">Bulk Upload</span>
+      <div class="section-title">Bulk Data Upload</div>
+      <div class="section-sub">Upload CSV or Excel files for World Check, PEP, or Special Category screening</div>
+    </div>
+
+    <div class="step-indicator">
+      <div class="step">
+        <div class="step-dot active" id="s1">1</div>
+        <div class="step-label active" id="sl1">Configure</div>
+      </div>
+      <div class="step-line" id="line1"></div>
+      <div class="step">
+        <div class="step-dot" id="s2">2</div>
+        <div class="step-label" id="sl2">Validate</div>
+      </div>
+      <div class="step-line" id="line2"></div>
+      <div class="step">
+        <div class="step-dot" id="s3">3</div>
+        <div class="step-label" id="sl3">Confirm</div>
+      </div>
+      <div class="step-line" id="line3"></div>
+      <div class="step">
+        <div class="step-dot" id="s4">4</div>
+        <div class="step-label" id="sl4">Complete</div>
+      </div>
+    </div>
+
+    <div class="status-banner" id="statusBanner">
+      <div class="spinner" id="bannerSpinner"></div>
+      <div class="status-icon icon-check" id="bannerCheck" style="display:none">&#10003;</div>
+      <div class="status-icon icon-x" id="bannerX" style="display:none">&#10005;</div>
+      <span id="bannerText"></span>
+    </div>
+
+    <div class="confirm-section" id="confirmSection">
+      <div class="confirm-text">
+        <strong>Validation successful &mdash; awaiting your confirmation</strong>
+        Reviewed 1,248 records. No schema errors detected. Click Confirm to persist data to backend tables.
+      </div>
+      <button class="btn btn-success" onclick="handleConfirm()">Confirm &amp; Submit</button>
+    </div>
+
+    <div class="form-inner">
+      <div class="form-row">
+        <div class="form-group">
+          <div class="form-label">Screening type <span>*</span></div>
+          <select id="screeningType">
+            <option value="">Select screening type&hellip;</option>
+            <option value="worldcheck">World Check</option>
+            <option value="pep">PEP Description</option>
+            <option value="special">Special Category</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Uploaded by <span>*</span></div>
+          <select id="uploadedBy">
+            <option value="anurag">Anurag Kumar</option>
+            <option value="priya">Priya Sharma</option>
+            <option value="rahul">Rahul Mehta</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-label" style="margin-bottom: 10px;">Attach file <span style="color:#E24B4A; margin-left:2px;">*</span></div>
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <div class="drop-icon">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+        </div>
+        <div class="drop-title">Drop your file here</div>
+        <div class="drop-sub">or <strong>browse to upload</strong> &nbsp;&middot;&nbsp; CSV, XLS, XLSX &nbsp;&middot;&nbsp; up to 50 MB</div>
+        <input type="file" id="fileInput" accept=".csv,.xls,.xlsx" onchange="handleFile(this.files[0])">
+      </div>
+      <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="file-chip" id="fileChip">
+        <div class="file-chip-icon">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <span class="file-chip-name" id="chipName"></span>
+        <span class="file-chip-size" id="chipSize"></span>
+        <button class="file-chip-remove" onclick="removeFile()" title="Remove file">&times;</button>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn" onclick="resetAll()">Reset</button>
+      <button class="btn btn-primary" id="submitBtn" disabled onclick="handleSubmit()">Submit for validation</button>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="table-section" id="tableSection">
+    <div class="table-card">
+      <div class="table-header-bar">
+        <div class="table-title">Upload history</div>
+        <span class="count-badge" id="recordCount">3 records</span>
+      </div>
+      <table>
+        <colgroup>
+          <col class="col-id"><col class="col-file"><col class="col-by">
+          <col class="col-date"><col class="col-type"><col class="col-status">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Request ID</th>
+            <th>Uploaded file</th>
+            <th>Uploaded by</th>
+            <th>Uploaded date</th>
+            <th>Screening type</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var uploadedFile = null;
+var uploadHistory = [
+  { id: '123', file: 'worldcheck_batch_march.csv', by: 'Anurag Kumar', date: '2025-03-14 09:42', type: 'World Check', status: 'failed', count: 10 },
+  { id: '122', file: 'pep_records_q1.xlsx', by: 'Priya Sharma', date: '2025-03-12 14:15', type: 'PEP Description', status: 'success', count: 0 },
+  { id: '121', file: 'special_cat_feb.csv', by: 'Rahul Mehta', date: '2025-03-10 11:30', type: 'Special Category', status: 'success', count: 0 }
+];
+
+function renderTable() {
+  var tbody = document.getElementById('historyBody');
+  tbody.innerHTML = '';
+  uploadHistory.forEach(function(row) {
+    var isFail = row.status === 'failed';
+    var pillHtml = isFail
+      ? '<span class="status-pill status-fail">&#9679; Failed (' + row.count + ')</span>'
+      : '<span class="status-pill status-success">&#9679; Success</span>';
+    tbody.innerHTML += '<tr>' +
+      '<td><span class="req-id">#' + row.id + '</span></td>' +
+      '<td title="' + row.file + '"><a class="file-link" href="#">' + row.file + '</a></td>' +
+      '<td>' + row.by + '</td>' +
+      '<td style="color:var(--text-secondary);font-size:12px">' + row.date + '</td>' +
+      '<td><span class="type-chip">' + row.type + '</span></td>' +
+      '<td>' + pillHtml + '</td>' +
+      '</tr>';
+  });
+  document.getElementById('recordCount').textContent = uploadHistory.length + ' records';
+  document.getElementById('tableSection').classList.add('visible');
+}
+
+function handleFile(file) {
+  if (!file) return;
+  uploadedFile = file;
+  document.getElementById('chipName').textContent = file.name;
+  var kb = file.size / 1024;
+  document.getElementById('chipSize').textContent = kb > 1024 ? (kb / 1024).toFixed(1) + ' MB' : Math.round(kb) + ' KB';
+  document.getElementById('fileChip').classList.add('visible');
+  checkSubmitReady();
+}
+
+function removeFile() {
+  uploadedFile = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('fileChip').classList.remove('visible');
+  checkSubmitReady();
+}
+
+function checkSubmitReady() {
+  var type = document.getElementById('screeningType').value;
+  document.getElementById('submitBtn').disabled = !(uploadedFile && type);
+}
+document.getElementById('screeningType').addEventListener('change', checkSubmitReady);
+
+function showBanner(type, msg) {
+  var b = document.getElementById('statusBanner');
+  b.className = 'status-banner visible ' + type;
+  document.getElementById('bannerSpinner').style.display = type === 'validating' ? 'block' : 'none';
+  document.getElementById('bannerCheck').style.display = type === 'success' ? 'flex' : 'none';
+  document.getElementById('bannerX').style.display = type === 'error' ? 'flex' : 'none';
+  document.getElementById('bannerText').textContent = msg;
+}
+
+function setStep(n) {
+  for (var i = 1; i <= 4; i++) {
+    var dot = document.getElementById('s' + i);
+    var lbl = document.getElementById('sl' + i);
+    if (i < n) { dot.className = 'step-dot done'; dot.innerHTML = '&#10003;'; lbl.className = 'step-label done'; }
+    else if (i === n) { dot.className = 'step-dot active'; dot.textContent = i; lbl.className = 'step-label active'; }
+    else { dot.className = 'step-dot'; dot.textContent = i; lbl.className = 'step-label'; }
+    if (i < 4) { document.getElementById('line' + i).className = i < n ? 'step-line done' : 'step-line'; }
+  }
+}
+
+function handleSubmit() {
+  var pb = document.getElementById('progressBar');
+  var pf = document.getElementById('progressFill');
+  pb.classList.add('visible'); pf.style.width = '0%';
+  showBanner('validating', 'Validating file against schema and reference data\u2026');
+  setStep(2);
+  document.getElementById('submitBtn').disabled = true;
+  var w = 0;
+  var iv = setInterval(function() {
+    w += Math.random() * 18; if (w >= 90) { w = 90; clearInterval(iv); }
+    pf.style.width = Math.min(w, 90) + '%';
+  }, 200);
+  setTimeout(function() {
+    clearInterval(iv); pf.style.width = '100%';
+    var isSuccess = document.getElementById('screeningType').value !== 'special';
+    setTimeout(function() {
+      pb.classList.remove('visible');
+      if (isSuccess) {
+        showBanner('success', 'Validation passed \u2014 1,248 records verified. No errors found.');
+        setStep(3);
+        document.getElementById('confirmSection').classList.add('visible');
+      } else {
+        showBanner('error', 'Validation failed \u2014 10 records contain errors. Review the history table below.');
+        setStep(2);
+        var now = new Date();
+        var dateStr = now.getFullYear() + '-' +
+          String(now.getMonth()+1).padStart(2,'0') + '-' +
+          String(now.getDate()).padStart(2,'0') + ' ' +
+          String(now.getHours()).padStart(2,'0') + ':' +
+          String(now.getMinutes()).padStart(2,'0');
+        var byEl = document.getElementById('uploadedBy');
+        uploadHistory.unshift({
+          id: String(parseInt(uploadHistory[0].id) + 1),
+          file: uploadedFile ? uploadedFile.name : 'special_cat_upload.csv',
+          by: byEl.options[byEl.selectedIndex].text,
+          date: dateStr, type: 'Special Category', status: 'failed', count: 10
+        });
+        renderTable();
+        document.getElementById('submitBtn').disabled = false;
+      }
+    }, 300);
+  }, 2800);
+}
+
+function handleConfirm() {
+  document.getElementById('confirmSection').classList.remove('visible');
+  showBanner('success', 'Data successfully committed to backend tables. All records have been saved.');
+  setStep(4);
+  var now = new Date();
+  var dateStr = now.getFullYear() + '-' +
+    String(now.getMonth()+1).padStart(2,'0') + '-' +
+    String(now.getDate()).padStart(2,'0') + ' ' +
+    String(now.getHours()).padStart(2,'0') + ':' +
+    String(now.getMinutes()).padStart(2,'0');
+  var byEl = document.getElementById('uploadedBy');
+  var typeEl = document.getElementById('screeningType');
+  uploadHistory.unshift({
+    id: String(parseInt(uploadHistory[0].id) + 1),
+    file: uploadedFile ? uploadedFile.name : 'upload.csv',
+    by: byEl.options[byEl.selectedIndex].text,
+    date: dateStr,
+    type: typeEl.options[typeEl.selectedIndex].text,
+    status: 'success', count: 0
+  });
+  renderTable();
+}
+
+function resetAll() {
+  removeFile();
+  document.getElementById('screeningType').value = '';
+  document.getElementById('statusBanner').className = 'status-banner';
+  document.getElementById('confirmSection').classList.remove('visible');
+  document.getElementById('progressBar').classList.remove('visible');
+  setStep(1);
+}
+
+var dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', function() { dz.classList.remove('drag-over'); });
+dz.addEventListener('drop', function(e) {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+
+renderTable();
+</script>
+</body>
+</html>
